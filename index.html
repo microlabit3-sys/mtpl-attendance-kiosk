@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTPL Attendance Kiosk</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #071f36;
+      color: white;
+      text-align: center;
+    }
+
+    .header {
+      padding: 20px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .sub {
+      font-size: 14px;
+      margin-bottom: 20px;
+      color: #cbd5e1;
+    }
+
+    .camera-box {
+      width: 90%;
+      max-width: 500px;
+      margin: auto;
+      border-radius: 18px;
+      overflow: hidden;
+      background: black;
+    }
+
+    video {
+      width: 100%;
+      display: block;
+      transform: scaleX(-1);
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 15px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      border: 0;
+      border-radius: 10px;
+      background: #1677ff;
+      color: white;
+    }
+
+    #status {
+      margin: 15px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    MTPL FACE ATTENDANCE
+  </div>
+
+  <div class="sub">
+    Mobile / Tablet Attendance Kiosk
+  </div>
+
+  <div class="camera-box">
+    <video id="camera" autoplay playsinline muted></video>
+  </div>
+
+  <div id="status">
+    Camera not started
+  </div>
+
+  <button onclick="startCamera()">
+    START CAMERA
+  </button>
+
+<script>
+
+async function startCamera() {
+
+  const status = document.getElementById("status");
+
+  try {
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user"
+      },
+      audio: false
+    });
+
+    document.getElementById("camera").srcObject = stream;
+
+    status.innerHTML = "FRONT CAMERA READY";
+
+  } catch(error) {
+
+    status.innerHTML =
+      "Camera permission denied or camera unavailable";
+
+    console.error(error);
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
