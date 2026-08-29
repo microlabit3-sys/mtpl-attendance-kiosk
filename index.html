@@ -1,117 +1,290 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MTPL Attendance Kiosk</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MTPL Mobile Attendance Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background: #071f36;
-      color: white;
+      color: #fff;
       text-align: center;
+      min-height: 100vh;
     }
-
-    .header {
-      padding: 20px;
-      font-size: 24px;
-      font-weight: bold;
+    .wrap { max-width: 620px; margin: 0 auto; padding: 20px 16px 40px; }
+    h1 { margin: 8px 0 4px; font-size: 28px; }
+    .sub { color: #cbd5e1; margin-bottom: 18px; }
+    .card {
+      background: #fff;
+      color: #0f172a;
+      border-radius: 16px;
+      padding: 16px;
+      margin: 14px 0;
+      text-align: left;
     }
-
-    .sub {
-      font-size: 14px;
-      margin-bottom: 20px;
-      color: #cbd5e1;
+    label { display: block; font-size: 13px; font-weight: 700; margin: 10px 0 6px; }
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 15px;
     }
-
-    .camera-box {
-      width: 90%;
-      max-width: 500px;
-      margin: auto;
+    .camera {
+      position: relative;
       border-radius: 18px;
       overflow: hidden;
-      background: black;
+      background: #000;
+      min-height: 280px;
     }
-
-    video {
-      width: 100%;
-      display: block;
-      transform: scaleX(-1);
+    video { width: 100%; display: block; transform: scaleX(-1); }
+    .badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(15,23,42,.82);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 13px;
     }
-
     button {
-      margin-top: 20px;
-      padding: 15px 30px;
-      font-size: 18px;
-      font-weight: bold;
+      width: 100%;
       border: 0;
-      border-radius: 10px;
+      border-radius: 12px;
+      padding: 15px;
+      font-size: 18px;
+      font-weight: 700;
       background: #1677ff;
       color: white;
+      margin-top: 14px;
     }
-
+    button:disabled { opacity: .55; }
     #status {
-      margin: 15px;
-      font-size: 16px;
+      margin: 16px 0 0;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.08);
+      min-height: 50px;
+      font-weight: 700;
     }
+    .warn {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+    .employee {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .empmeta { color: #475569; font-size: 13px; margin-top: 4px; }
   </style>
 </head>
-
 <body>
+<div class="wrap">
+  <h1>MTPL ATTENDANCE TEST</h1>
+  <div class="sub">One-person mobile camera → automatic OUT test</div>
 
-  <div class="header">
-    MTPL FACE ATTENDANCE
+  <div class="card">
+    <div class="employee">R PRAKASH</div>
+    <div class="empmeta">ML/0275 · Face Device User ID 275 · Authorized test: OUT only</div>
+
+    <label for="apiUrl">Apps Script Web App URL</label>
+    <input id="apiUrl" type="url" placeholder="Paste .../exec URL">
+
+    <label for="apiToken">DEVICE_API_TOKEN</label>
+    <input id="apiToken" type="password" autocomplete="off" placeholder="Paste token from MTPL Settings sheet">
+
+    <div class="warn">
+      The token stays only in this browser page memory and is not stored in GitHub.
+      This test detects that one face is present; it does not identify the person.
+    </div>
   </div>
 
-  <div class="sub">
-    Mobile / Tablet Attendance Kiosk
-  </div>
-
-  <div class="camera-box">
+  <div class="camera">
     <video id="camera" autoplay playsinline muted></video>
+    <div class="badge" id="faceBadge">Camera stopped</div>
   </div>
 
-  <div id="status">
-    Camera not started
-  </div>
+  <div id="status">Ready for one authorized OUT test.</div>
 
-  <button onclick="startCamera()">
-    START CAMERA
-  </button>
+  <button id="startBtn" onclick="startTest()">START ONE-PERSON OUT TEST</button>
+</div>
 
 <script>
+const FACE_ID = '275';
+let human = null;
+let running = false;
+let sent = false;
+let stableSince = 0;
 
-async function startCamera() {
+const video = document.getElementById('camera');
+const statusEl = document.getElementById('status');
+const badgeEl = document.getElementById('faceBadge');
+const startBtn = document.getElementById('startBtn');
 
-  const status = document.getElementById("status");
-
-  try {
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user"
-      },
-      audio: false
-    });
-
-    document.getElementById("camera").srcObject = stream;
-
-    status.innerHTML = "FRONT CAMERA READY";
-
-  } catch(error) {
-
-    status.innerHTML =
-      "Camera permission denied or camera unavailable";
-
-    console.error(error);
-
-  }
-
+function setStatus(msg) {
+  statusEl.textContent = msg;
 }
 
-</script>
+async function startCamera() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: 'user',
+      width: { ideal: 720 },
+      height: { ideal: 960 }
+    },
+    audio: false
+  });
+  video.srcObject = stream;
+  await video.play();
+  badgeEl.textContent = 'Camera ready';
+}
 
+async function loadDetector() {
+  setStatus('Loading face detector… first load may take a little time.');
+
+  const config = {
+    backend: 'webgl',
+    modelBasePath: 'https://cdn.jsdelivr.net/npm/@vladmandic/human/models/',
+    face: {
+      enabled: true,
+      detector: { enabled: true, rotation: true },
+      mesh: { enabled: false },
+      iris: { enabled: false },
+      description: { enabled: false },
+      emotion: { enabled: false },
+      antispoof: { enabled: false },
+      liveness: { enabled: false }
+    },
+    body: { enabled: false },
+    hand: { enabled: false },
+    object: { enabled: false },
+    gesture: { enabled: false }
+  };
+
+  human = new Human.Human(config);
+  await human.load();
+  await human.warmup();
+}
+
+async function sendOut() {
+  if (sent) return;
+  sent = true;
+  running = false;
+  startBtn.disabled = true;
+
+  const apiUrl = document.getElementById('apiUrl').value.trim();
+  const token = document.getElementById('apiToken').value.trim();
+
+  const payload = {
+    token,
+    deviceId: 'MTPL_MOBILE_FACE_TEST',
+    faceDeviceUserId: FACE_ID,
+    timestamp: new Date().toISOString(),
+    punchType: 'OUT'
+  };
+
+  setStatus('Face present. Sending authorized OUT punch…');
+
+  try {
+    await fetch(apiUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      redirect: 'follow',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload)
+    });
+
+    localStorage.setItem('mtpl_rprakash_out_test_sent', new Date().toISOString());
+    badgeEl.textContent = 'OUT request sent';
+    setStatus('OUT request sent. Now check MTPL Attendance / Punch Log.');
+  } catch (err) {
+    sent = false;
+    running = true;
+    startBtn.disabled = false;
+    badgeEl.textContent = 'Send failed';
+    setStatus('Could not send punch: ' + err.message);
+  }
+}
+
+async function detectLoop() {
+  while (running && !sent) {
+    try {
+      const result = await human.detect(video);
+      const faces = result && result.face ? result.face : [];
+
+      if (faces.length === 1) {
+        const f = faces[0];
+        const confidence = Number(f.faceScore || f.boxScore || f.score || 0);
+        const size = f.box ? Math.min(f.box[2], f.box[3]) : 0;
+
+        if (confidence >= 0.75 && size >= 160) {
+          if (!stableSince) stableSince = Date.now();
+          const held = Date.now() - stableSince;
+          const left = Math.max(0, 2 - Math.floor(held / 1000));
+          badgeEl.textContent = held >= 2000 ? 'Face confirmed' : `Hold still ${left}s`;
+
+          if (held >= 2000) {
+            await sendOut();
+            break;
+          }
+        } else {
+          stableSince = 0;
+          badgeEl.textContent = 'Move closer / face camera';
+        }
+      } else {
+        stableSince = 0;
+        badgeEl.textContent = faces.length > 1 ? 'Only one person' : 'No face';
+      }
+    } catch (err) {
+      console.error(err);
+      badgeEl.textContent = 'Detecting…';
+    }
+
+    await new Promise(r => setTimeout(r, 250));
+  }
+}
+
+async function startTest() {
+  if (localStorage.getItem('mtpl_rprakash_out_test_sent')) {
+    setStatus('This browser has already sent the one-person OUT test.');
+    return;
+  }
+
+  const apiUrl = document.getElementById('apiUrl').value.trim();
+  const token = document.getElementById('apiToken').value.trim();
+
+  if (!apiUrl.endsWith('/exec')) {
+    setStatus('Paste the Apps Script Web App URL ending in /exec.');
+    return;
+  }
+
+  if (!token) {
+    setStatus('Paste DEVICE_API_TOKEN from the MTPL Settings sheet.');
+    return;
+  }
+
+  startBtn.disabled = true;
+
+  try {
+    await startCamera();
+    if (!human) await loadDetector();
+    running = true;
+    setStatus('Camera armed. Put only R PRAKASH in front of the camera and hold still.');
+    detectLoop();
+  } catch (err) {
+    startBtn.disabled = false;
+    setStatus('Camera/model error: ' + err.message);
+  }
+}
+</script>
 </body>
 </html>
